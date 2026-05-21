@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="es" data-theme="light">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>🚚 Repartidor v2.5 · Viandas Tandil</title>
+
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#E8500A">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
+
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
+<style>
+:root {
+  --orange:#E8500A; --orange-l:#FFF0E8; --orange-m:#FDDEC9;
+  --green:#1A7A45;  --green-l:#E8F5EE;
+  --blue:#1A5FA8;   --blue-l:#E8F1FA;
+  --danger:#C0392B; --danger-l:#FDECEA;
+  --gold:#B7860D;   --gold-l:#FEF9E7;
+  --bg:#F7F4F0; --card:#FFFFFF; --border:#EDE8E0;
+  --text:#1C1915; --muted:#8C8074; --light:#C5BDB3;
+  --f:'Plus Jakarta Sans',sans-serif;
+  --r:20px; --rs:12px;
+}
+[data-theme="dark"] {
+  --bg:#141210; --card:#1E1B18; --border:#2E2A26;
+  --text:#F0EDE8; --muted:#7A7068; --light:#3A3530;
+  --orange-l:#2A1A0E; --orange-m:#3A2010;
+  --green-l:#0D1F14; --blue-l:#0E1824;
+  --danger-l:#200F0E; --gold-l:#1A1508;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+body{font-family:var(--f);background:var(--bg);color:var(--text);padding-bottom:120px;min-height:100vh;transition:background .25s,color .25s;}
+
+.header{background:var(--card);border-bottom:1.5px solid var(--border);padding:13px 15px 11px;position:sticky;top:0;z-index:100;}
+.header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:0;}
+.logo{display:flex;align-items:center;gap:9px;}
+.logo-icon{width:35px;height:35px;background:var(--orange);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+.logo h1{font-size:15px;font-weight:800;letter-spacing:-.4px;}
+.header-actions{display:flex;gap:6px;}
+.btn-icon{background:var(--bg);border:1.5px solid var(--border);border-radius:var(--rs);padding:7px 11px;cursor:pointer;font-family:var(--f);font-size:13px;font-weight:700;color:var(--text);display:flex;align-items:center;gap:5px;transition:all .15s;white-space:nowrap;}
+.btn-icon:active{transform:scale(.96);}
+
+.vianda-counter{background:var(--card);border-bottom:2px solid var(--border);padding:10px 15px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.vc-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-right:4px;}
+.vc-pill.clasicas{background:var(--orange-l);color:var(--orange);border:1.5px solid var(--orange-m);}
+.vc-pill.saludables{background:var(--green-l);color:var(--green);border:1.5px solid #B7DFCA;}
+.vc-pill.total{background:var(--text);color:var(--bg);}
+.vc-num{font-size:17px;font-weight:800;line-height:1;}
+.vc-lbl{font-size:10px;font-weight:700;opacity:.75;}
+.vc-progress{flex:1;min-width:120px;display:flex;flex-direction:column;gap:3px;}
+.vc-bar-wrap{height:6px;background:var(--border);border-radius:3px;overflow:hidden;}
+.vc-bar{height:100%;background:var(--green);border-radius:3px;transition:width .4s ease;}
+.vc-bar-lbl{font-size:10px;font-weight:700;color:var(--muted);}
+
+.import-area{margin:16px 15px;background:var(--card);border:2.5px dashed var(--orange);border-radius:var(--r);padding:28px 20px;text-align:center;}
+.import-area h2{font-size:18px;font-weight:800;margin-bottom:6px;}
+.import-area p{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.5;}
+.btn-upload{display:inline-flex;align-items:center;gap:8px;background:var(--orange);color:#fff;padding:13px 24px;border-radius:15px;font-weight:800;font-size:15px;cursor:pointer;transition:all .15s;border:none;font-family:var(--f);}
+.btn-upload:active{transform:scale(.96);}
+#fileInput{display:none;}
+.load-status{color:var(--orange);font-weight:700;margin-top:12px;font-size:13px;display:none;}
+
+main{padding:12px 15px 0;}
+
+.client-card{background:var(--card);border:1.5px solid var(--border);border-radius:var(--r);margin-bottom:12px;overflow:hidden;transition:all .25s;box-shadow:0 2px 8px rgba(0,0,0,.03);}
+.client-card.delivered{opacity:.55;border-color:transparent;background:var(--bg);}
+.client-card.delivered .card-address{text-decoration:line-through;color:var(--muted);}
+.client-card.delivered .card-name{text-decoration:line-through;}
+
+.drag-handle{padding:8px 15px 0;color:var(--light);font-size:18px;cursor:grab;text-align:center;user-select:none;letter-spacing:3px;}
+.drag-handle:active{cursor:grabbing;}
+
+.card-main{display:flex;align-items:flex-start;gap:12px;padding:10px 14px 12px;}
+.card-body{flex:1;min-width:0;}
+
+.card-address{font-size:17px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
+.card-address .pin{color:var(--orange);font-size:14px;flex-shrink:0;}
+.card-name{font-size:12px;color:var(--muted);margin-top:3px;font-style:italic;}
+
+.card-viandas{display:flex;gap:7px;margin-top:10px;flex-wrap:wrap;}
+.v-badge{display:flex;align-items:center;gap:4px;padding:5px 10px;border-radius:10px;font-weight:700;font-size:13px;}
+.v-badge.clasica{background:var(--orange-l);color:var(--orange);border:1px solid var(--orange-m);}
+.v-badge.saludable{background:var(--green-l);color:var(--green);border:1px solid #B7DFCA;}
+.v-badge-num{font-size:18px;font-weight:800;line-height:1;}
+
+.card-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;align-items:center;}
+.tag{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:7px;font-size:10px;font-weight:700;}
+.tag.plan-diario{background:var(--orange-l);color:var(--orange);}
+.tag.plan-semanal{background:var(--blue-l);color:var(--blue);}
+.tag.plan-mensual{background:var(--gold-l);color:var(--gold);}
+.tag.neutral{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
+
+.card-obs{font-size:11px;color:var(--orange);font-weight:700;margin-top:6px;padding:6px 8px;background:var(--orange-l);border-radius:8px;display:flex;align-items:center;gap:4px;}
+
+.card-right{display:flex;flex-direction:column;align-items:center;gap:8px;flex-shrink:0;}
+
+.check-btn{width:52px;height:52px;border-radius:16px;border:2.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;background:var(--bg);transition:all .2s;flex-shrink:0;}
+.check-btn:active{transform:scale(.88);}
+.delivered .check-btn{background:var(--green);color:#fff;border-color:var(--green);}
+
+.phone-btn{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;cursor:pointer;background:var(--bg);transition:all .2s;text-decoration:none;}
+.phone-btn:active{transform:scale(.88);}
+.phone-btn.has-phone{background:var(--green-l);border-color:var(--green);color:var(--green);}
+.phone-btn.no-phone{opacity:.35;pointer-events:none;}
+
+.card-cobro{display:flex;gap:8px;padding:10px 14px 14px;border-top:1.5px solid var(--border);}
+.delivered .card-cobro{display:none;}
+.cobro-btn{flex:1;padding:10px 8px;border-radius:12px;border:none;font-family:var(--f);font-size:12px;font-weight:800;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:5px;letter-spacing:.2px;}
+.cobro-btn:active{transform:scale(.95);}
+.cobro-efectivo{background:var(--blue);color:#fff;}
+.cobro-transferencia{background:var(--gold);color:#fff;}
+.cobro-efectivo.cobrado{background:var(--green);color:#fff;}
+.cobro-transferencia.cobrado{background:var(--green);color:#fff;}
+
+.resumen-panel{background:var(--card);border:2px solid var(--green);border-radius:var(--r);margin:16px 15px;padding:20px;display:none;}
+.resumen-panel.visible{display:block;}
+.resumen-title{font-size:20px;font-weight:800;color:var(--green);display:flex;align-items:center;gap:8px;margin-bottom:16px;}
+.resumen-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px;}
+.res-card{padding:14px;border-radius:var(--rs);border:1.5px solid var(--border);}
+.res-card.green{background:var(--green-l);border-color:#86EFAC;}
+.res-card.blue{background:var(--blue-l);border-color:#93C5FD;}
+.res-card.gold{background:var(--gold-l);border-color:#FDE68A;}
+.res-card.orange{background:var(--orange-l);border-color:var(--orange-m);}
+.res-val{font-size:20px;font-weight:800;color:var(--text);}
+.res-lbl{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px;}
+.btn-nueva-ruta{width:100%;padding:14px;border-radius:15px;border:none;background:var(--text);color:var(--bg);font-family:var(--f);font-size:16px;font-weight:800;cursor:pointer;margin-top:12px;transition:all .15s;}
+.btn-nueva-ruta:active{transform:scale(.98);}
+
+.toast{position:fixed;bottom:96px;left:50%;transform:translateX(-50%) translateY(16px);background:var(--text);color:var(--bg);padding:9px 18px;border-radius:28px;font-size:13px;font-weight:700;opacity:0;transition:all .3s;z-index:900;white-space:nowrap;pointer-events:none;}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+.empty-state{text-align:center;padding:50px 20px;color:var(--muted);}
+.empty-state .icon{font-size:44px;margin-bottom:10px;}
+
+.paid-badge{display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border-radius:7px;font-size:10px;font-weight:700;background:var(--green-l);color:var(--green);border:1px solid #86EFAC;}
+
+@media(max-width:380px){
+  .card-address{font-size:15px;}
+  .check-btn{width:46px;height:46px;}
+  .v-badge-num{font-size:16px;}
+}
+</style>
+</head>
+<body>
+
+<header class="header">
+  <div class="header-top">
+    <div class="logo">
+      <div class="logo-icon">🚚</div>
+      <h1>Reparto Tandil</h1>
+    </div>
+    <div class="header-actions">
+      <button class="btn-icon" id="darkBtn" onclick="toggleDark()" title="Tema">🌙</button>
+      <button class="btn-icon" onclick="confirmReset()" style="color:var(--danger);border-color:var(--danger);">🗑 Limpiar</button>
+    </div>
+  </div>
+</header>
+
+<div class="vianda-counter" id="viandaCounter" style="display:none;">
+  <span class="vc-title">Quedan:</span>
+  <div class="vc-pill clasicas">
+    <span class="vc-num" id="vcClasicas">0</span>
+    <span class="vc-lbl">🍗 Clás.</span>
+  </div>
+  <div class="vc-pill saludables">
+    <span class="vc-num" id="vcSaludables">0</span>
+    <span class="vc-lbl">🥕 Salud.</span>
+  </div>
+  <div class="vc-progress">
+    <div class="vc-bar-lbl" id="vcBarLbl">0 de 0 entregas</div>
+    <div class="vc-bar-wrap">
+      <div class="vc-bar" id="vcBar" style="width:0%"></div>
+    </div>
+  </div>
+</div>
+
+<div id="importZone" class="import-area">
+  <h2>📋 Cargar Hoja de Ruta</h2>
+  <p>Subí tu Excel en cualquier formato.<br><strong>¡Lee TODAS las hojas a la vez!</strong></p>
+  <label class="btn-upload" for="fileInput">
+    📂 Seleccionar Archivo
+  </label>
+  <input type="file" id="fileInput" accept=".csv,.txt,.xls,.xlsx"/>
+  <div id="loadStatus" class="load-status">⏳ Procesando archivo...</div>
+</div>
+
+<main id="mainContent" style="display:none;">
+  <div id="listaEntregas"></div>
+</main>
+
+<div class="resumen-panel" id="resumenPanel">
+  <div class="resumen-title">🎉 ¡Ruta completada!</div>
+  <div class="resumen-grid" id="resumenGrid"></div>
+  <div id="resumenViandas"></div>
+  <button class="btn-nueva-ruta" onclick="confirmReset()">🔄 Nueva hoja de ruta</button>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// Registro del Service Worker optimizado para GitHub Pages
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js')
+      .then(reg => console.log('Service Worker registrado con éxito. Scope:', reg.scope))
+      .catch(err => console.log('Error al registrar Service Worker:', err));
+  });
+}
+
+// ─── STATE ───
+const STORAGE_KEY = 'repartidor_v2';
+let entregas = [];
+let darkMode = false;
+
+function init() {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (saved) {
+      const data = JSON.parse(saved);
+      entregas = data.entregas || [];
+      darkMode = data.darkMode || false;
+    }
+  } catch(e) { console.warn(e); }
+  applyDark();
+  if (entregas.length > 0) {
+    document.getElementById('importZone').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    render();
+  }
+}
+
+function save() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ entregas, darkMode }));
+  } catch(e) {}
+}
+
+function applyDark() {
+  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light');
+  document.getElementById('darkBtn').textContent = darkMode ? '☀️' : '🌙';
+}
+
+function toggleDark() { darkMode = !darkMode; applyDark(); save(); }
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg; el.classList.add('show');
+  clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2400);
+}
+
+// ─── MOTOR DE LECTURA MULTI-HOJA (EXCEL Y CSV) ───
+document.getElementById('fileInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  
+  document.getElementById('loadStatus').style.display = 'block';
+  const reader = new FileReader();
+  
+  reader.onload = function(e) {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, {type: 'array'});
+      
+      let todasLasEntregas = [];
+      
+      workbook.SheetNames.forEach(sheetName => {
+        const worksheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+        
+        const entregasDeHoja = extraerEntregasDeFilas(rows);
+        todasLasEntregas = todasLasEntregas.concat(entregasDeHoja);
+      });
+      
+      document.getElementById('loadStatus').style.display = 'none';
+      
+      if (todasLasEntregas.length === 0) { 
+        toast('⚠️ Archivo sin entregas válidas en ninguna hoja'); 
+        return; 
+      }
+      
+      entregas = todasLasEntregas;
+      save();
+      document.getElementById('importZone').style.display = 'none';
+      document.getElementById('mainContent').style.display = 'block';
+      render();
+      toast(`✅ ${todasLasEntregas.length} clientes listos (de todas las hojas)`);
+      
+    } catch(err) {
+      console.error(err);
+      toast('⚠️ Error al procesar el archivo Excel/CSV');
+      document.getElementById('loadStatus').style.display = 'none';
+    }
+  };
+  reader.readAsArrayBuffer(file);
+  this.value = '';
+});
+
+function extraerEntregasDeFilas(rows) {
+  if (!rows || rows.length < 2) return [];
+  
+  let headerIndex = 0;
+  for(let i = 0; i < Math.min(rows.length, 6); i++) {
+    if(rows[i] && rows[i].some(c => {
+      let s = String(c || '').toLowerCase();
+      return s.includes('direc') || s.includes('domi') || s.includes('clas') || s.includes('salud');
+    })) {
+      headerIndex = i;
+      break;
+    }
+  }
+
+  const headers = (rows[headerIndex] || []).map(h => String(h || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,''));
+  
+  const idx = {
+    direccion: headers.findIndex(h => h.includes('direcci') || h.includes('domicilio') || h.includes('address')),
+    nombre:    headers.findIndex(h => h.includes('nombre') || h.includes('cliente') || h.includes('name')),
+    clasicas:  headers.findIndex(h => h.includes('clas') || h.includes('classic')),
+    saludables:headers.findIndex(h => h.includes('salud') || h.includes('health')),
+    plan:      headers.findIndex(h => h.includes('plan') || h.includes('pago') || h.includes('tipo')),
+    telefono:  headers.findIndex(h => h.includes('tel') || h.includes('phone') || h.includes('fono')),
+    obs:       headers.findIndex(h => h.includes('obs') || h.includes('nota') || h.includes('note')),
+  };
+
+  if (idx.direccion === -1) idx.direccion = 0;
+
+  const nuevas = [];
+  rows.slice(headerIndex + 1).forEach((cols) => {
+    if (!cols || cols.length === 0) return;
+    
+    const direccion = idx.direccion >= 0 ? String(cols[idx.direccion] || '').trim() : '';
+    if (!direccion || direccion.toLowerCase() === 'total' || direccion === '0') return;
+
+    const clasicas  = Math.max(0, parseInt(idx.clasicas >= 0 ? cols[idx.clasicas] : 0) || 0);
+    const saludables= Math.max(0, parseInt(idx.saludables >= 0 ? cols[idx.saludables] : 0) || 0);
+    
+    if (clasicas === 0 && saludables === 0) return;
+
+    const nombre    = idx.nombre >= 0 ? String(cols[idx.nombre] || '').trim() : '';
+    const planRaw   = idx.plan >= 0 ? String(cols[idx.plan] || '').trim() : 'Diario';
+    const plan      = planRaw ? planRaw.charAt(0).toUpperCase() + planRaw.slice(1).toLowerCase() : 'Diario';
+    const payType   = ['Diario','Semanal','Mensual'].includes(plan) ? plan : 'Diario';
+    const telefono  = idx.telefono >= 0 ? String(cols[idx.telefono] || '').trim() : '';
+    const obs       = idx.obs >= 0 ? String(cols[idx.obs] || '').trim() : '';
+
+    const requiereCobro = /pag[a-záéíóú]*/i.test(obs);
+    
+    let monto = 0;
+    let textoBoton = '';
+
+    if (requiereCobro) {
+      const matchNum = obs.match(/\d+/);
+      if (matchNum) {
+        const num = parseInt(matchNum[0]);
+        if (num < 1000) {
+          monto = num * 1000;
+          textoBoton = String(num); 
+        } else {
+          monto = num;
+          textoBoton = String(num);
+        }
+      } else {
+        monto = (clasicas + saludables) * 7000;
+        textoBoton = String(monto / 1000);
+      }
+    }
+
+    nuevas.push({
+      id: Date.now() + '_' + Math.random().toString(36).slice(2),
+      direccion, nombre, clasicas, saludables, payType,
+      telefono: telefono.replace(/[^0-9+\s\-]/g, '').trim(),
+      obs, monto, requiereCobro, textoBoton,
+      entregado: false, cobradoEfectivo: false, cobradoTransferencia: false,
+    });
+  });
+
+  return nuevas;
+}
+
+function fmtMoney(n) { return '$' + Number(n).toLocaleString('es-AR'); }
+
+function marcarEntregado(id) {
+  const e = entregas.find(x => x.id === id);
+  if (!e) return;
+  e.entregado = !e.entregado;
+  if (navigator.vibrate) navigator.vibrate(50);
+  save(); render(); checkResumen();
+}
+
+function cobrar(id, tipo) {
+  const e = entregas.find(x => x.id === id);
+  if (!e) return;
+  if (tipo === 'efectivo') {
+    e.cobradoEfectivo = !e.cobradoEfectivo;
+    if (e.cobradoEfectivo) e.cobradoTransferencia = false;
+  } else {
+    e.cobradoTransferencia = !e.cobradoTransferencia;
+    if (e.cobradoTransferencia) e.cobradoEfectivo = false;
+  }
+  save(); renderCard(id);
+}
+
+function render() { renderCounter(); renderList(); checkResumen(); }
+
+function renderCounter() {
+  const activas = entregas.filter(e => !e.entregado);
+  const total = entregas.length;
+  const entregadas = total - activas.length;
+  const clRest = activas.reduce((s, e) => s + e.clasicas, 0);
+  const salRest = activas.reduce((s, e) => s + e.saludables, 0);
+  const pct = total > 0 ? (entregadas / total) * 100 : 0;
+  
+  document.getElementById('vcClasicas').textContent = clRest;
+  document.getElementById('vcSaludables').textContent = salRest;
+  document.getElementById('vcBar').style.width = pct + '%';
+  document.getElementById('vcBarLbl').textContent = `${entregadas} de ${total}`;
+  document.getElementById('viandaCounter').style.display = total > 0 ? 'flex' : 'none';
+}
+
+function renderList() {
+  const container = document.getElementById('listaEntregas');
+  container.innerHTML = '';
+  if (entregas.length === 0) {
+    container.innerHTML = `<div class="empty-state"><p>No hay entregas cargadas.</p></div>`;
+    return;
+  }
+  entregas.forEach(e => container.appendChild(buildCard(e)));
+  
+  Sortable.create(container, {
+    handle: '.drag-handle', animation: 150,
+    onEnd: function() {
+      const items = Array.from(container.querySelectorAll('.client-card'));
+      entregas = items.map(item => entregas.find(e => e.id === item.getAttribute('data-id'))).filter(Boolean);
+      save();
+    }
+  });
+}
+
+function buildCard(e) {
+  const card = document.createElement('div');
+  card.className = 'client-card' + (e.entregado ? ' delivered' : '');
+  card.setAttribute('data-id', e.id);
+  
+  let viandas = '';
+  if (e.clasicas > 0) viandas += `<div class="v-badge clasica"><span class="v-badge-num">${e.clasicas}</span> 🍗 Clás.</div>`;
+  if (e.saludables > 0) viandas += `<div class="v-badge saludable"><span class="v-badge-num">${e.saludables}</span> 🥕 Salud.</div>`;
+  
+  const planClass = e.payType === 'Semanal' ? 'plan-semanal' : e.payType === 'Mensual' ? 'plan-mensual' : 'plan-diario';
+  const hasTel = e.telefono && e.telefono.length > 3;
+  const efCls = e.cobradoEfectivo ? 'cobrado' : '';
+  const trCls = e.cobradoTransferencia ? 'cobrado' : '';
+  
+  let paidBadge = e.cobradoEfectivo ? `<span class="paid-badge">💵 Cobrado</span>` : (e.cobradoTransferencia ? `<span class="paid-badge">📲 Transferido</span>` : '');
+  
+  let bloqueCobro = '';
+  if (e.requiereCobro) {
+    bloqueCobro = `
+    <div class="card-cobro" style="${e.entregado ? 'display:none' : ''}">
+      <button class="cobro-btn cobro-efectivo ${efCls}" onclick="cobrar('${e.id}','efectivo')">💵 Efec. ${e.textoBoton}</button>
+      <button class="cobro-btn cobro-transferencia ${trCls}" onclick="cobrar('${e.id}','transferencia')">📲 Trans. ${e.textoBoton}</button>
+    </div>`;
+  }
+
+  card.innerHTML = `
+    <div class="drag-handle">⠿⠿⠿</div>
+    <div class="card-main">
+      <div class="card-body">
+        <div class="card-address">📍 <span>${e.direccion}</span></div>
+        ${e.nombre ? `<div class="card-name">👤 ${e.nombre}</div>` : ''}
+        <div class="card-viandas">${viandas}</div>
+        <div class="card-meta"><span class="tag ${planClass}">${e.payType.toUpperCase()}</span> ${paidBadge}</div>
+        ${e.obs ? `<div class="card-obs">⚠️ ${e.obs}</div>` : ''}
+      </div>
+      <div class="card-right">
+        <div class="check-btn" onclick="marcarEntregado('${e.id}')">${e.entregado ? '✓' : ''}</div>
+        ${hasTel ? `<a class="phone-btn has-phone" href="tel:${e.telefono}">📞</a>` : `<div class="phone-btn no-phone">📵</div>`}
+      </div>
+    </div>
+    ${bloqueCobro}
+  `;
+  return card;
+}
+
+function renderCard(id) {
+  const container = document.getElementById('listaEntregas');
+  const old = container.querySelector(`[data-id="${id}"]`);
+  if (!old) { render(); return; }
+  const e = entregas.find(x => x.id === id);
+  container.replaceChild(buildCard(e), old);
+  renderCounter(); checkResumen();
+}
+
+function checkResumen() {
+  if (entregas.length === 0) return;
+  const entregadas = entregas.filter(e => e.entregado).length;
+  if (entregadas === entregas.length) { 
+    renderResumen(); 
+    document.getElementById('resumenPanel').classList.add('visible'); 
+  } else { 
+    document.getElementById('resumenPanel').classList.remove('visible'); 
+  }
+}
+
+function renderResumen() {
+  const ef = entregas.filter(e => e.cobradoEfectivo).reduce((s, e) => s + (e.monto || 0), 0);
+  const tr = entregas.filter(e => e.cobradoTransferencia).reduce((s, e) => s + (e.monto || 0), 0);
+  
+  const siPagaron = entregas.filter(e => e.cobradoEfectivo || e.cobradoTransferencia);
+  const noPagaron = entregas.filter(e => e.requiereCobro && !e.cobradoEfectivo && !e.cobradoTransferencia);
+  
+  let resumenListasHTML = '';
+
+  if (siPagaron.length > 0) {
+    resumenListasHTML += `
+      <div style="margin-top:15px; padding:12px; background:var(--green-l); border:1.5px solid #86EFAC; border-radius:var(--rs); text-align:left;">
+        <div style="font-weight:800; color:var(--green); font-size:13px; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px;">✅ Cobros realizados:</div>
+        <ul style="list-style:none; padding:0; margin:0; font-size:12px; display:flex; flex-direction:column; gap:5px;">
+          ${siPagaron.map(p => `
+            <li style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:4px; gap:10px;">
+              <span style="flex:1;">📍 <strong>${p.direccion}</strong> ${p.nombre ? `(${p.nombre})` : ''}</span>
+              <span style="font-weight:700; color:var(--green); white-space:nowrap;">
+                ${p.cobradoEfectivo ? '💵' : '📲'} ${fmtMoney(p.monto)}
+              </span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>`;
+  }
+
+  if (noPagaron.length > 0) {
+    resumenListasHTML += `
+      <div style="margin-top:15px; padding:12px; background:var(--danger-l); border:1.5px solid #FCA5A5; border-radius:var(--rs); text-align:left;">
+        <div style="font-weight:800; color:var(--danger); font-size:13px; margin-bottom:6px; text-transform:uppercase; letter-spacing:.5px;">❌ Cobros pendientes:</div>
+        <ul style="list-style:none; padding:0; margin:0; font-size:12px; display:flex; flex-direction:column; gap:5px;">
+          ${noPagaron.map(p => `
+            <li style="display:flex; justify-content:space-between; align-items:center; border-bottom:1px dashed var(--border); padding-bottom:4px; gap:10px;">
+              <span style="flex:1;">📍 <strong>${p.direccion}</strong> ${p.nombre ? `(${p.nombre})` : ''}</span>
+              <span style="font-weight:700; color:var(--danger); white-space:nowrap;">Debe: ${fmtMoney(p.monto)}</span>
+            </li>
+          `).join('')}
+        </ul>
+      </div>`;
+  } else if (entregas.filter(e => e.requiereCobro).length > 0) {
+    resumenListasHTML += `
+      <div style="margin-top:15px; padding:10px; background:var(--green-l); border:1.5px solid #86EFAC; border-radius:var(--rs); text-align:left; font-size:12px; font-weight:700; color:var(--green);">
+        ✅ ¡Excelente! Se recaudaron todos los cobros programados para hoy.
+      </div>`;
+  }
+
+  document.getElementById('resumenGrid').innerHTML = `
+    <div class="res-card green"><div class="res-val">${fmtMoney(ef+tr)}</div><div class="res-lbl">Total Cobrado</div></div>
+    <div class="res-card blue"><div class="res-val">${fmtMoney(ef)}</div><div class="res-lbl">Efectivo</div></div>
+    <div class="res-card gold"><div class="res-val">${fmtMoney(tr)}</div><div class="res-lbl">Transf.</div></div>
+    <div class="res-card orange"><div class="res-val">${noPagaron.length}</div><div class="res-lbl">Impagos</div></div>`;
+    
+  document.getElementById('resumenViandas').innerHTML = resumenListasHTML;
+}
+
+function confirmReset() {
+  if (confirm('¿Limpiar ruta actual?')) {
+    entregas = []; save();
+    document.getElementById('importZone').style.display = 'block';
+    document.getElementById('mainContent').style.display = 'none';
+    document.getElementById('viandaCounter').style.display = 'none';
+    document.getElementById('resumenPanel').classList.remove('visible');
+    toast('🗑 Ruta limpia para un nuevo día');
+  }
+}
+
+init();
+</script>
+</body>
+</html>
