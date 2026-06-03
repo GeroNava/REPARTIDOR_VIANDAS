@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>🚚 Repartidor v2.6 · Viandas Tandil</title>
+<title>🚚 Repartidor v2.5.1 · Viandas Tandil</title>
 
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#E8500A">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<!-- Librería SheetJS para leer cualquier formato de Excel (.xlsx, .xls) y CSV -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
@@ -73,7 +73,7 @@ main{padding:12px 15px 0;}
 .client-card.delivered .card-address{text-decoration:line-through;color:var(--muted);}
 .client-card.delivered .card-name{text-decoration:line-through;}
 
-/* ESTILOS PARA PEDIDOS ESPECIALES (AMARILLO) */
+/* ESTILOS PARA PEDIDOS ESPECIALES (0 VIANDAS = AMARILLO) */
 .client-card.especial {
   background: var(--gold-l);
   border: 2px solid #FCD34D;
@@ -86,34 +86,11 @@ main{padding:12px 15px 0;}
   color: var(--gold);
 }
 
-.card-main{display:flex;align-items:flex-start;gap:12px;padding:12px 14px;}
-.card-body{flex:1;min-width:0;}
+.drag-handle{padding:8px 15px 0;color:var(--light);font-size:18px;cursor:grab;text-align:center;user-select:none;letter-spacing:3px;}
+.drag-handle:active{cursor:grabbing;}
 
-/* CONTROLES PARA SUBIR Y BAJAR */
-.order-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding-right: 12px;
-  border-right: 1.5px solid var(--border);
-  justify-content: center;
-}
-.btn-move {
-  background: var(--bg);
-  border: 1.5px solid var(--border);
-  color: var(--muted);
-  border-radius: 8px;
-  width: 34px;
-  height: 34px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-.btn-move:active { transform: scale(0.85); background: var(--border); }
-.btn-move:disabled { opacity: 0.25; pointer-events: none; }
+.card-main{display:flex;align-items:flex-start;gap:12px;padding:10px 14px 12px;}
+.card-body{flex:1;min-width:0;}
 
 .card-address{font-size:17px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .card-address .pin{color:var(--orange);font-size:14px;flex-shrink:0;}
@@ -243,8 +220,8 @@ main{padding:12px 15px 0;}
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js')
-      .then(reg => console.log('SW registrado'))
-      .catch(err => console.log('Error SW:', err));
+      .then(reg => console.log('Service Worker registrado con éxito. Scope:', reg.scope))
+      .catch(err => console.log('Error al registrar Service Worker:', err));
   });
 }
 
@@ -289,7 +266,7 @@ function toast(msg) {
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-// ─── MOTOR DE LECTURA MULTI-HOJA ───
+// ─── MOTOR DE LECTURA MULTI-HOJA (EXCEL Y CSV) ───
 document.getElementById('fileInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -300,22 +277,22 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
   reader.onload = function(e) {
     try {
       const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, {type: 'array', cellStyles: true});
+      const workbook = XLSX.read(data, {type: 'array'});
       
       let todasLasEntregas = [];
       
       workbook.SheetNames.forEach(sheetName => {
         const worksheet = workbook.Sheets[sheetName];
-        // blankrows: true para mantener la correspondencia exacta de filas
-        const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1, blankrows: true});
-        const entregasDeHoja = extraerEntregasDeFilas(rows, worksheet);
+        const rows = XLSX.utils.sheet_to_json(worksheet, {header: 1});
+        
+        const entregasDeHoja = extraerEntregasDeFilas(rows);
         todasLasEntregas = todasLasEntregas.concat(entregasDeHoja);
       });
       
       document.getElementById('loadStatus').style.display = 'none';
       
       if (todasLasEntregas.length === 0) { 
-        toast('⚠️ Archivo sin entregas válidas'); 
+        toast('⚠️ Archivo sin entregas válidas en ninguna hoja'); 
         return; 
       }
       
@@ -328,7 +305,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
       
     } catch(err) {
       console.error(err);
-      toast('⚠️ Error al procesar el archivo Excel');
+      toast('⚠️ Error al procesar el archivo Excel/CSV');
       document.getElementById('loadStatus').style.display = 'none';
     }
   };
@@ -336,11 +313,11 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
   this.value = '';
 });
 
-function extraerEntregasDeFilas(rows, worksheet) {
+function extraerEntregasDeFilas(rows) {
   if (!rows || rows.length < 2) return [];
   
   let headerIndex = 0;
-  for(let i = 0; i < Math.min(rows.length, 10); i++) {
+  for(let i = 0; i < Math.min(rows.length, 6); i++) {
     if(rows[i] && rows[i].some(c => {
       let s = String(c || '').toLowerCase();
       return s.includes('direc') || s.includes('domi') || s.includes('clas') || s.includes('salud');
@@ -365,16 +342,18 @@ function extraerEntregasDeFilas(rows, worksheet) {
   if (idx.direccion === -1) idx.direccion = 0;
 
   const nuevas = [];
-  rows.slice(headerIndex + 1).forEach((cols, index) => {
+  rows.slice(headerIndex + 1).forEach((cols) => {
     if (!cols || cols.length === 0) return;
     
+    // Primero, verificamos que tenga una dirección válida.
     const direccion = idx.direccion >= 0 ? String(cols[idx.direccion] || '').trim() : '';
     if (!direccion || direccion.toLowerCase() === 'total' || direccion === '0') return;
 
     const clasicas  = Math.max(0, parseInt(idx.clasicas >= 0 ? cols[idx.clasicas] : 0) || 0);
     const saludables= Math.max(0, parseInt(idx.saludables >= 0 ? cols[idx.saludables] : 0) || 0);
     
-    if (clasicas === 0 && saludables === 0) return;
+    // LÓGICA DE PEDIDO ESPECIAL: Si hay dirección, pero tiene 0 clásicas y 0 saludables, es amarillo.
+    const esEspecial = (clasicas === 0 && saludables === 0);
 
     const nombre    = idx.nombre >= 0 ? String(cols[idx.nombre] || '').trim() : '';
     const planRaw   = idx.plan >= 0 ? String(cols[idx.plan] || '').trim() : 'Diario';
@@ -385,25 +364,6 @@ function extraerEntregasDeFilas(rows, worksheet) {
 
     const requiereCobro = /pag[a-záéíóú]*/i.test(obs);
     
-    // VERIFICACIÓN DE PEDIDO ESPECIAL (AMARILLO)
-    // 1. Por texto de respaldo
-    let esEspecial = /especial|amarill/i.test(obs) || /especial|amarill/i.test(nombre);
-    
-    // 2. Intentar leer color de la celda en Excel
-    const realRow = headerIndex + 1 + index;
-    if (!esEspecial && worksheet) {
-      for(let c = 0; c < Math.max(10, cols.length); c++) {
-        const cellAddr = XLSX.utils.encode_cell({r: realRow, c: c});
-        const cell = worksheet[cellAddr];
-        if (cell && cell.s && cell.s.fgColor && cell.s.fgColor.rgb) {
-          if (cell.s.fgColor.rgb.toUpperCase().includes('FFFF')) { // FFFF00 es Amarillo
-            esEspecial = true;
-            break;
-          }
-        }
-      }
-    }
-
     let monto = 0;
     let textoBoton = '';
 
@@ -420,6 +380,8 @@ function extraerEntregasDeFilas(rows, worksheet) {
         }
       } else {
         monto = (clasicas + saludables) * 7000;
+        // Si no tiene viandas y no le pusieron un monto, por defecto no mostramos nada raro
+        if (monto === 0) monto = 1000; 
         textoBoton = String(monto / 1000);
       }
     }
@@ -428,7 +390,7 @@ function extraerEntregasDeFilas(rows, worksheet) {
       id: Date.now() + '_' + Math.random().toString(36).slice(2),
       direccion, nombre, clasicas, saludables, payType,
       telefono: telefono.replace(/[^0-9+\s\-]/g, '').trim(),
-      obs, monto, requiereCobro, textoBoton, esEspecial,
+      obs, monto, requiereCobro, textoBoton, esEspecial, // Guardamos que es especial
       entregado: false, cobradoEfectivo: false, cobradoTransferencia: false,
     });
   });
@@ -459,27 +421,6 @@ function cobrar(id, tipo) {
   save(); renderCard(id);
 }
 
-// FUNCIONES PARA MOVER DE POSICIÓN
-function moverArr(id) {
-  const idx = entregas.findIndex(x => x.id === id);
-  if (idx > 0) {
-    const temp = entregas[idx];
-    entregas[idx] = entregas[idx - 1];
-    entregas[idx - 1] = temp;
-    save(); renderList();
-  }
-}
-
-function moverAbj(id) {
-  const idx = entregas.findIndex(x => x.id === id);
-  if (idx < entregas.length - 1) {
-    const temp = entregas[idx];
-    entregas[idx] = entregas[idx + 1];
-    entregas[idx + 1] = temp;
-    save(); renderList();
-  }
-}
-
 function render() { renderCounter(); renderList(); checkResumen(); }
 
 function renderCounter() {
@@ -504,16 +445,25 @@ function renderList() {
     container.innerHTML = `<div class="empty-state"><p>No hay entregas cargadas.</p></div>`;
     return;
   }
-  entregas.forEach((e, i) => container.appendChild(buildCard(e, i, entregas.length)));
+  entregas.forEach(e => container.appendChild(buildCard(e)));
+  
+  Sortable.create(container, {
+    handle: '.drag-handle', animation: 150,
+    onEnd: function() {
+      const items = Array.from(container.querySelectorAll('.client-card'));
+      entregas = items.map(item => entregas.find(e => e.id === item.getAttribute('data-id'))).filter(Boolean);
+      save();
+    }
+  });
 }
 
-function buildCard(e, index, total) {
-  const card = document.createElement('div');
-  
+function buildCard(e) {
+  // Aplicamos la clase especial si tiene 0 viandas
   let cssClass = 'client-card';
   if (e.entregado) cssClass += ' delivered';
-  if (e.esEspecial) cssClass += ' especial'; // Clase amarilla
-  
+  if (e.esEspecial) cssClass += ' especial';
+
+  const card = document.createElement('div');
   card.className = cssClass;
   card.setAttribute('data-id', e.id);
   
@@ -538,15 +488,12 @@ function buildCard(e, index, total) {
   }
 
   card.innerHTML = `
+    <div class="drag-handle">⠿⠿⠿</div>
     <div class="card-main">
-      <div class="order-controls">
-        <button class="btn-move" onclick="moverArr('${e.id}')" ${index === 0 ? 'disabled' : ''}>▲</button>
-        <button class="btn-move" onclick="moverAbj('${e.id}')" ${index === total - 1 ? 'disabled' : ''}>▼</button>
-      </div>
       <div class="card-body">
         <div class="card-address">📍 <span>${e.direccion}</span></div>
         ${e.nombre ? `<div class="card-name">👤 ${e.nombre}</div>` : ''}
-        <div class="card-viandas">${viandas}</div>
+        ${viandas ? `<div class="card-viandas">${viandas}</div>` : ''}
         <div class="card-meta"><span class="tag ${planClass}">${e.payType.toUpperCase()}</span> ${paidBadge}</div>
         ${e.obs ? `<div class="card-obs">⚠️ ${e.obs}</div>` : ''}
       </div>
@@ -564,9 +511,8 @@ function renderCard(id) {
   const container = document.getElementById('listaEntregas');
   const old = container.querySelector(`[data-id="${id}"]`);
   if (!old) { render(); return; }
-  const index = entregas.findIndex(x => x.id === id);
-  const e = entregas[index];
-  container.replaceChild(buildCard(e, index, entregas.length), old);
+  const e = entregas.find(x => x.id === id);
+  container.replaceChild(buildCard(e), old);
   renderCounter(); checkResumen();
 }
 
