@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>🚚 Repartidor v2.5.1 · Viandas Tandil</title>
+<title>🚚 Repartidor v2.6 · Viandas Tandil</title>
 
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#E8500A">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+<!-- Librería SheetJS para leer cualquier formato de Excel (.xlsx, .xls) y CSV -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
@@ -86,11 +86,14 @@ main{padding:12px 15px 0;}
   color: var(--gold);
 }
 
-.drag-handle{padding:8px 15px 0;color:var(--light);font-size:18px;cursor:grab;text-align:center;user-select:none;letter-spacing:3px;}
-.drag-handle:active{cursor:grabbing;}
-
-.card-main{display:flex;align-items:flex-start;gap:12px;padding:10px 14px 12px;}
+.card-main{display:flex;align-items:center;gap:12px;padding:10px 14px 12px;}
 .card-body{flex:1;min-width:0;}
+
+/* BOTONES DE ORDENAMIENTO */
+.order-controls {display:flex; flex-direction:column; gap:6px; flex-shrink:0;}
+.btn-move {background:var(--bg); border:1.5px solid var(--border); border-radius:10px; width:34px; height:34px; display:flex; align-items:center; justify-content:center; font-size:14px; cursor:pointer; color:var(--text); transition:all 0.2s;}
+.btn-move:active {transform: scale(0.9);}
+.btn-move:disabled {opacity: 0.3; pointer-events: none;}
 
 .card-address{font-size:17px;font-weight:800;letter-spacing:-.3px;display:flex;align-items:center;gap:5px;flex-wrap:wrap;}
 .card-address .pin{color:var(--orange);font-size:14px;flex-shrink:0;}
@@ -104,9 +107,6 @@ main{padding:12px 15px 0;}
 
 .card-meta{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px;align-items:center;}
 .tag{display:inline-flex;align-items:center;gap:3px;padding:3px 8px;border-radius:7px;font-size:10px;font-weight:700;}
-.tag.plan-diario{background:var(--orange-l);color:var(--orange);}
-.tag.plan-semanal{background:var(--blue-l);color:var(--blue);}
-.tag.plan-mensual{background:var(--gold-l);color:var(--gold);}
 .tag.neutral{background:var(--bg);color:var(--muted);border:1px solid var(--border);}
 
 .card-obs{font-size:11px;color:var(--orange);font-weight:700;margin-top:6px;padding:6px 8px;background:var(--orange-l);border-radius:8px;display:flex;align-items:center;gap:4px;}
@@ -266,7 +266,7 @@ function toast(msg) {
   clearTimeout(el._t); el._t = setTimeout(() => el.classList.remove('show'), 2400);
 }
 
-// ─── MOTOR DE LECTURA MULTI-HOJA (EXCEL Y CSV) ───
+// ─── MOTOR DE LECTURA MULTI-HOJA ───
 document.getElementById('fileInput').addEventListener('change', function(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -292,7 +292,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
       document.getElementById('loadStatus').style.display = 'none';
       
       if (todasLasEntregas.length === 0) { 
-        toast('⚠️ Archivo sin entregas válidas en ninguna hoja'); 
+        toast('⚠️ Archivo sin entregas válidas'); 
         return; 
       }
       
@@ -305,7 +305,7 @@ document.getElementById('fileInput').addEventListener('change', function(e) {
       
     } catch(err) {
       console.error(err);
-      toast('⚠️ Error al procesar el archivo Excel/CSV');
+      toast('⚠️ Error al procesar el archivo');
       document.getElementById('loadStatus').style.display = 'none';
     }
   };
@@ -334,7 +334,6 @@ function extraerEntregasDeFilas(rows) {
     nombre:    headers.findIndex(h => h.includes('nombre') || h.includes('cliente') || h.includes('name')),
     clasicas:  headers.findIndex(h => h.includes('clas') || h.includes('classic')),
     saludables:headers.findIndex(h => h.includes('salud') || h.includes('health')),
-    plan:      headers.findIndex(h => h.includes('plan') || h.includes('pago') || h.includes('tipo')),
     telefono:  headers.findIndex(h => h.includes('tel') || h.includes('phone') || h.includes('fono')),
     obs:       headers.findIndex(h => h.includes('obs') || h.includes('nota') || h.includes('note')),
   };
@@ -345,20 +344,15 @@ function extraerEntregasDeFilas(rows) {
   rows.slice(headerIndex + 1).forEach((cols) => {
     if (!cols || cols.length === 0) return;
     
-    // Primero, verificamos que tenga una dirección válida.
     const direccion = idx.direccion >= 0 ? String(cols[idx.direccion] || '').trim() : '';
     if (!direccion || direccion.toLowerCase() === 'total' || direccion === '0') return;
 
     const clasicas  = Math.max(0, parseInt(idx.clasicas >= 0 ? cols[idx.clasicas] : 0) || 0);
     const saludables= Math.max(0, parseInt(idx.saludables >= 0 ? cols[idx.saludables] : 0) || 0);
     
-    // LÓGICA DE PEDIDO ESPECIAL: Si hay dirección, pero tiene 0 clásicas y 0 saludables, es amarillo.
     const esEspecial = (clasicas === 0 && saludables === 0);
 
     const nombre    = idx.nombre >= 0 ? String(cols[idx.nombre] || '').trim() : '';
-    const planRaw   = idx.plan >= 0 ? String(cols[idx.plan] || '').trim() : 'Diario';
-    const plan      = planRaw ? planRaw.charAt(0).toUpperCase() + planRaw.slice(1).toLowerCase() : 'Diario';
-    const payType   = ['Diario','Semanal','Mensual'].includes(plan) ? plan : 'Diario';
     const telefono  = idx.telefono >= 0 ? String(cols[idx.telefono] || '').trim() : '';
     const obs       = idx.obs >= 0 ? String(cols[idx.obs] || '').trim() : '';
 
@@ -380,7 +374,6 @@ function extraerEntregasDeFilas(rows) {
         }
       } else {
         monto = (clasicas + saludables) * 7000;
-        // Si no tiene viandas y no le pusieron un monto, por defecto no mostramos nada raro
         if (monto === 0) monto = 1000; 
         textoBoton = String(monto / 1000);
       }
@@ -388,9 +381,9 @@ function extraerEntregasDeFilas(rows) {
 
     nuevas.push({
       id: Date.now() + '_' + Math.random().toString(36).slice(2),
-      direccion, nombre, clasicas, saludables, payType,
+      direccion, nombre, clasicas, saludables,
       telefono: telefono.replace(/[^0-9+\s\-]/g, '').trim(),
-      obs, monto, requiereCobro, textoBoton, esEspecial, // Guardamos que es especial
+      obs, monto, requiereCobro, textoBoton, esEspecial,
       entregado: false, cobradoEfectivo: false, cobradoTransferencia: false,
     });
   });
@@ -405,7 +398,7 @@ function marcarEntregado(id) {
   if (!e) return;
   e.entregado = !e.entregado;
   if (navigator.vibrate) navigator.vibrate(50);
-  save(); render(); checkResumen();
+  save(); renderCard(id);
 }
 
 function cobrar(id, tipo) {
@@ -419,6 +412,22 @@ function cobrar(id, tipo) {
     if (e.cobradoTransferencia) e.cobradoEfectivo = false;
   }
   save(); renderCard(id);
+}
+
+// ─── FUNCIONES DE ORDENAMIENTO (BOTONES) ───
+function moverEntrega(index, direccion) {
+  // direccion: -1 (subir), 1 (bajar)
+  if (direccion === -1 && index > 0) {
+    let temp = entregas[index - 1];
+    entregas[index - 1] = entregas[index];
+    entregas[index] = temp;
+  } else if (direccion === 1 && index < entregas.length - 1) {
+    let temp = entregas[index + 1];
+    entregas[index + 1] = entregas[index];
+    entregas[index] = temp;
+  }
+  save(); 
+  renderList();
 }
 
 function render() { renderCounter(); renderList(); checkResumen(); }
@@ -445,20 +454,14 @@ function renderList() {
     container.innerHTML = `<div class="empty-state"><p>No hay entregas cargadas.</p></div>`;
     return;
   }
-  entregas.forEach(e => container.appendChild(buildCard(e)));
   
-  Sortable.create(container, {
-    handle: '.drag-handle', animation: 150,
-    onEnd: function() {
-      const items = Array.from(container.querySelectorAll('.client-card'));
-      entregas = items.map(item => entregas.find(e => e.id === item.getAttribute('data-id'))).filter(Boolean);
-      save();
-    }
+  // Pasamos el índice a la función para saber la posición actual de cada tarjeta
+  entregas.forEach((e, index) => {
+    container.appendChild(buildCard(e, index));
   });
 }
 
-function buildCard(e) {
-  // Aplicamos la clase especial si tiene 0 viandas
+function buildCard(e, index) {
   let cssClass = 'client-card';
   if (e.entregado) cssClass += ' delivered';
   if (e.esEspecial) cssClass += ' especial';
@@ -471,7 +474,6 @@ function buildCard(e) {
   if (e.clasicas > 0) viandas += `<div class="v-badge clasica"><span class="v-badge-num">${e.clasicas}</span> 🍗 Clás.</div>`;
   if (e.saludables > 0) viandas += `<div class="v-badge saludable"><span class="v-badge-num">${e.saludables}</span> 🥕 Salud.</div>`;
   
-  const planClass = e.payType === 'Semanal' ? 'plan-semanal' : e.payType === 'Mensual' ? 'plan-mensual' : 'plan-diario';
   const hasTel = e.telefono && e.telefono.length > 3;
   const efCls = e.cobradoEfectivo ? 'cobrado' : '';
   const trCls = e.cobradoTransferencia ? 'cobrado' : '';
@@ -488,13 +490,16 @@ function buildCard(e) {
   }
 
   card.innerHTML = `
-    <div class="drag-handle">⠿⠿⠿</div>
     <div class="card-main">
+      <div class="order-controls">
+        <button class="btn-move" onclick="moverEntrega(${index}, -1)" ${index === 0 ? 'disabled' : ''}>⬆️</button>
+        <button class="btn-move" onclick="moverEntrega(${index}, 1)" ${index === entregas.length - 1 ? 'disabled' : ''}>⬇️</button>
+      </div>
       <div class="card-body">
         <div class="card-address">📍 <span>${e.direccion}</span></div>
         ${e.nombre ? `<div class="card-name">👤 ${e.nombre}</div>` : ''}
         ${viandas ? `<div class="card-viandas">${viandas}</div>` : ''}
-        <div class="card-meta"><span class="tag ${planClass}">${e.payType.toUpperCase()}</span> ${paidBadge}</div>
+        ${paidBadge ? `<div class="card-meta">${paidBadge}</div>` : ''}
         ${e.obs ? `<div class="card-obs">⚠️ ${e.obs}</div>` : ''}
       </div>
       <div class="card-right">
@@ -511,8 +516,12 @@ function renderCard(id) {
   const container = document.getElementById('listaEntregas');
   const old = container.querySelector(`[data-id="${id}"]`);
   if (!old) { render(); return; }
-  const e = entregas.find(x => x.id === id);
-  container.replaceChild(buildCard(e), old);
+  
+  // Buscamos el índice correcto para reconstruir la tarjeta con los botones bien asignados
+  const index = entregas.findIndex(x => x.id === id);
+  const e = entregas[index];
+  
+  container.replaceChild(buildCard(e, index), old);
   renderCounter(); checkResumen();
 }
 
