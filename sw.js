@@ -1,12 +1,12 @@
-// Aumenté la versión a v2.6 para forzar a los teléfonos a actualizar
-const CACHE_NAME = 'viandas-reparto-cache-v2.6';
+const CACHE_NAME = 'viandas-reparto-cache-v2.5.1';
 
-// Eliminada la librería "Sortable.js" ya que ahora usamos los botones
+// Lista de recursos locales y CDN externos que se guardarán en el teléfono
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   'https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap',
+  'https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js'
 ];
 
