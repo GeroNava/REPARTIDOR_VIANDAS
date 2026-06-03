@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
-<title>🚚 Repartidor v2.6 · Viandas Tandil</title>
+<title>🚚 Repartidor v2.6.1 · Viandas Tandil</title>
 
 <link rel="manifest" href="./manifest.json">
 <meta name="theme-color" content="#E8500A">
@@ -12,7 +12,6 @@
 <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/2830/2830305.png">
 
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
-<!-- Librería SheetJS para leer cualquier formato de Excel (.xlsx, .xls) y CSV -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <style>
@@ -37,7 +36,14 @@
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 body{font-family:var(--f);background:var(--bg);color:var(--text);padding-bottom:120px;min-height:100vh;transition:background .25s,color .25s;}
 
-.header{background:var(--card);border-bottom:1.5px solid var(--border);padding:13px 15px 11px;position:sticky;top:0;z-index:100;}
+/* CONTENEDOR FIJO PARA HEADER Y CONTADOR */
+.sticky-wrapper {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+
+.header{background:var(--card);border-bottom:1.5px solid var(--border);padding:13px 15px 11px;}
 .header-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:0;}
 .logo{display:flex;align-items:center;gap:9px;}
 .logo-icon{width:35px;height:35px;background:var(--orange);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;}
@@ -162,33 +168,35 @@ main{padding:12px 15px 0;}
 </head>
 <body>
 
-<header class="header">
-  <div class="header-top">
-    <div class="logo">
-      <div class="logo-icon">🚚</div>
-      <h1>Reparto Tandil</h1>
+<div class="sticky-wrapper">
+  <header class="header">
+    <div class="header-top">
+      <div class="logo">
+        <div class="logo-icon">🚚</div>
+        <h1>Reparto Tandil</h1>
+      </div>
+      <div class="header-actions">
+        <button class="btn-icon" id="darkBtn" onclick="toggleDark()" title="Tema">🌙</button>
+        <button class="btn-icon" onclick="confirmReset()" style="color:var(--danger);border-color:var(--danger);">🗑 Limpiar</button>
+      </div>
     </div>
-    <div class="header-actions">
-      <button class="btn-icon" id="darkBtn" onclick="toggleDark()" title="Tema">🌙</button>
-      <button class="btn-icon" onclick="confirmReset()" style="color:var(--danger);border-color:var(--danger);">🗑 Limpiar</button>
-    </div>
-  </div>
-</header>
+  </header>
 
-<div class="vianda-counter" id="viandaCounter" style="display:none;">
-  <span class="vc-title">Quedan:</span>
-  <div class="vc-pill clasicas">
-    <span class="vc-num" id="vcClasicas">0</span>
-    <span class="vc-lbl">🍗 Clás.</span>
-  </div>
-  <div class="vc-pill saludables">
-    <span class="vc-num" id="vcSaludables">0</span>
-    <span class="vc-lbl">🥕 Salud.</span>
-  </div>
-  <div class="vc-progress">
-    <div class="vc-bar-lbl" id="vcBarLbl">0 de 0 entregas</div>
-    <div class="vc-bar-wrap">
-      <div class="vc-bar" id="vcBar" style="width:0%"></div>
+  <div class="vianda-counter" id="viandaCounter" style="display:none;">
+    <span class="vc-title">Quedan:</span>
+    <div class="vc-pill clasicas">
+      <span class="vc-num" id="vcClasicas">0</span>
+      <span class="vc-lbl">🍗 Clás.</span>
+    </div>
+    <div class="vc-pill saludables">
+      <span class="vc-num" id="vcSaludables">0</span>
+      <span class="vc-lbl">🥕 Salud.</span>
+    </div>
+    <div class="vc-progress">
+      <div class="vc-bar-lbl" id="vcBarLbl">0 de 0 entregas</div>
+      <div class="vc-bar-wrap">
+        <div class="vc-bar" id="vcBar" style="width:0%"></div>
+      </div>
     </div>
   </div>
 </div>
@@ -416,7 +424,6 @@ function cobrar(id, tipo) {
 
 // ─── FUNCIONES DE ORDENAMIENTO (BOTONES) ───
 function moverEntrega(index, direccion) {
-  // direccion: -1 (subir), 1 (bajar)
   if (direccion === -1 && index > 0) {
     let temp = entregas[index - 1];
     entregas[index - 1] = entregas[index];
@@ -455,7 +462,6 @@ function renderList() {
     return;
   }
   
-  // Pasamos el índice a la función para saber la posición actual de cada tarjeta
   entregas.forEach((e, index) => {
     container.appendChild(buildCard(e, index));
   });
@@ -517,7 +523,6 @@ function renderCard(id) {
   const old = container.querySelector(`[data-id="${id}"]`);
   if (!old) { render(); return; }
   
-  // Buscamos el índice correcto para reconstruir la tarjeta con los botones bien asignados
   const index = entregas.findIndex(x => x.id === id);
   const e = entregas[index];
   
